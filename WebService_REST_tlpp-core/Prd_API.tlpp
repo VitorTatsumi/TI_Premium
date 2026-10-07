@@ -1,0 +1,307 @@
+#Include "tlpp-core.th"
+#Include "tlpp-rest.th"
+#Include "Protheus.ch"
+#Include "RwMake.ch"
+#Include "TBIConn.ch"
+
+Namespace Promex.Api.Prd_API
+
+#DEFINE CONSULTA 1
+#DEFINE ALTERACAO 2
+#DEFINE DELETAR 3
+
+Class Prd_API
+
+    Public Method New() Constructor
+
+    @Get("/Prd_API/consultar")
+    Public Method Consultar()
+
+    @Put("/Prd_API/alterar")
+    Public Method Alterar()
+
+    @Delete("/Prd_API/deletar")
+    Public Method Deletar()
+
+EndClass
+
+Method New() Class Prd_API
+Return Self
+
+Method Consultar() Class Prd_API
+
+    Local oJson   As Json
+    Local oQuery  As Json
+    Local cCodigo As Character
+    Local cFil As Character
+
+    //Vai no ambiente Promex.Api.Prd_API e chama a User Function preparaAmbiente()
+    Promex.Api.Prd_API.u_preparaAmbiente()
+
+    oQuery := JsonObject():New()
+    oQuery  := oRest:getQueryRequest()
+
+    If oQuery != Nil 
+        cCodigo := IIf(oQuery:HasProperty("codigo"), oQuery["codigo"], "")
+        cFil := IIf(oQuery:HasProperty("filial"), oQuery["filial"], "")
+    Else
+        oRest:setStatusCode(400)
+        oRest:setResponse('{"Erro": "Parâmetros inválidos."}')
+    Endif
+
+    If Empty(AllTrim(cCodigo)) .OR. Empty(AllTrim(cFil))
+        oRest:setStatusCode(400)
+        oRest:setResponse('{"Erro": "Parâmetros inválidos."}')
+        Return .T.
+    Endif
+
+    aInfPrd := consPrd(cCodigo, cFil)
+
+    TRY
+
+        //oJson := {"Info": aInfPrd, "codigo": codigo}
+        oJson := JsonObject():New()
+        //oJson["Info"] := aInfPrd
+        aEval(aInfPrd, {|x|oJson[x[1]] := x[2]})
+
+        oRest:setKeyHeaderResponse("Content-Type", "application/json")
+        oRest:setResponse(oJson:ToJson())
+
+        FreeObj(oJson)
+
+    CATCH oError
+
+        oRest:setStatusCode(500)
+        oRest:setResponse('{"Erro":"Ocorreu um erro inesperado"}')
+
+    ENDTRY
+
+Return .T.
+
+
+Method Alterar() Class Prd_API
+
+    Local cBody As Character
+    Local cFilialP As Character
+    Local cCodigo As Character
+    Local cNewCod As Character
+    Local xError
+    Local jBody As Json
+
+    cBody := oRest:getBodyRequest()
+    jBody := JsonObject():New()
+    xError := jBody:FromJson(cBody)
+
+    If ValType(xError) == "C"
+        Return getError(400, "Json inválido " + xError)
+    Endif
+
+    lRetCmp := vldCmpJ(jBody, ALTERACAO)
+
+    If lRetCmp
+  
+        cFilialP := jBody["filial"]
+        cCodigo  := jBody["codigo"]
+        cNewCod  := jBody["novo_codigo"]
+
+        DbSelectArea("SB1")
+        // SB1->(DBSetOrder(1))
+
+        If !SB1->(DBSetOrder(1), MsSeek(cFilialP + cCodigo))
+            Return getError(404, "Produto não encontrado.")
+        Endif
+
+        If !RecLock("SB1", .F.)
+            Return getError(409, "Registro está alocado por outro usuário no momento.")
+        Endif
+
+        TRY 
+            SB1->B1_COD := cNewCod
+            SB1->(MsUnlock())
+
+            jResp := JsonObject():New()
+            
+            jResp["mensagem"] := "Produto alterado com sucesso!"
+
+            oRest:setKeyHeaderResponse("Concent-Type", "application/json")
+            oRest:setStatusCode(200)
+            oRest:setResponse(jResp:ToJson())
+
+            FreeObj(jResp)
+
+        CATCH oError
+            Return getErro(500, "Ocorreu um erro inesperado.")
+        ENDTRY
+
+    Endif
+
+    FreeObj(jBody)
+
+Return .T.
+
+
+Method Deletar() Class Prd_API
+
+    Local oQueryDel As Json
+    Local aPrdDel := {} As Array
+    Local cFilialP As Character
+    Local cCodigo As Character
+    Local cColecao As Character
+    Local nAux As Numeric
+    Local cLogTxt As Character
+
+    Private lMsErroAuto    := .F.
+    Private lMsHelpAuto    := .T.
+    Private lAutoErrNoFile := .T.
+
+    Promex.Api.Prd_API.u_preparaAmbiente()
+
+    oQueryDel := JsonObject():New()
+    oQueryDel := oRest:GetQueryRequest()
+
+    If vldCmpJ(oQueryDel, DELETAR)
+
+        cFilialP := oQueryDel["filial"]
+        cCodigo  := oQueryDel["codigo"]
+        cColecao := oQueryDel["colecao"]
+
+        If abreSB1(cFilialP, cCodigo)
+
+            cFilAnt := cFilialP
+
+            aAdd(aPrdDel, {"B1_FILIAL", cFilialP, NIL})
+            aAdd(aPrdDel, {"B1_COD", cCodigo, NIL})
+            aAdd(aPrdDel, {"B1_LOCPAD", cColecao, NIL})
+
+            //A forma correta seria chamar o ExecAuto via MVC para melhor manipulação dos dados e tratamento de erros
+            //Para encurtar o caminho, de forma paliativa é possível fazer via RecLock e D_E_L_E_T_, mas não é o ideal pois dispensa as validações
+            TRY     
+                SetFunName("MATA010")
+                MsExecAuto({|x, y| Mata010(x,y)}, aPrdDel, 5)
+
+                If lMsErroAuto
+                    aLogAuto := GetAutoGRLog()
+                
+                    For nAux:=1 To Len(aLogAuto)
+                        cLogTxt += aLogAuto[nAux] + Chr(13)+Chr(10)
+                    Next
+                    Return getError(422, "Erro lMsErroAuto" + cLogTxt)
+                Endif
+
+                jResp := JsonObject():New()
+                
+                jResp["mensagem"] := "Produto deletado com sucesso!"
+
+                oRest:setKeyHeaderResponse("Concent-Type", "application/json")
+                oRest:setStatusCode(200)
+                oRest:setResponse(jResp:ToJson())
+
+                FreeObj(jResp)
+
+            CATCH oError
+                Return getError(500, "Ocorreu um erro inesperado. TRY/CATCH")
+            ENDTRY
+        Endif
+    Endif
+
+Return .T. 
+
+
+Static Function abreSB1(cFilialP, cCodigo)
+
+    Local lRet := .T.
+
+    DbSelectArea("SB1")
+
+    If !SB1->(DBSetOrder(1), MsSeek(cFilialP + cCodigo))
+        lRet := .F.
+        Return getError(404, "Produto " + AllTrim(cCodigo) + " não encontrado.")
+    Endif
+
+Return lRet
+
+Static Function vldCmpJ(jJson, nOpc)
+
+    Local cFil As Character
+    Local cCod As Character
+    Local cNewCod As Character
+    Local cColecao As Character
+    Local lRet := .T.
+
+    cFil := Iif(jJson:HasProperty("filial"), jJson["filial"], "")
+    cCod := Iif(jJson:HasProperty("codigo"), jJson["codigo"], "")
+
+    If ValType(cFil) != "C" .OR. ValType(cCod) != "C" .OR.;
+        Empty(AllTrim(cFil)) .OR. Empty(AllTrim(cCod))
+        lRet := .F.
+        Return getError(400, "Campos obrigatórios inválidos.")
+    Endif
+    
+    If nOpc == ALTERACAO
+        
+        cNewCod := Iif(jJson:HasProperty("novo_codigo"), jJson["novo_codigo"], "")
+
+        If ValType(cNewCod) != "C" .OR. Empty(AllTrim(cNewCod))
+            lRet := .F.
+            Return getError(400, "Campos obrigatórios inválidos.")
+        Endif
+
+    Elseif nOpc == DELETAR
+
+        cColecao := Iif(jJson:HasProperty("colecao"), jJson["colecao"], "")
+
+        If ValType(cColecao) != "C" .OR. Empty(AllTrim(cColecao))
+            lRet := .F.
+            Return getError(400, "Campos obrigatórios inválidos.")
+        Endif
+
+    Endif
+
+Return lRet
+
+
+Static Function getError(nStat, cMsg)
+
+    Local jErro := JsonObject():New()
+
+    jErro["code"] := nStat
+    jErro["erro"] := cMsg
+
+    oRest:setKeyHeaderResponse("Content-Type", "application/json")
+    oRest:setStatusCode(nStat)
+    oRest:setResponse(jErro:ToJson())
+
+    FreeObj(jErro)
+
+Return .T.
+
+User Function preparaAmbiente()
+
+    Local cCodEmp := '02' As Character
+    Local cCodFil := '01' As Character
+    Local cUsuario := 'admin' As Character
+    Local cPass := '' As Character
+
+    If Select("SX2") <= 0
+        RPCSetEnv(cCodEmp, cCodFil, cUsuario, cPass)
+    Endif
+
+Return
+
+Static Function consPrd(cCodigoProduto, cFilialProduto)
+
+    Local cAlias := "SB1"
+    Local aPrd := {} As Array
+    Local nX As Numeric
+    
+    DbSelectArea(cAlias)
+
+    If !(cAlias)->(DBSetOrder(1), MsSeek(cFilialProduto + cCodigoProduto))
+        Return getError(404, "Produto não encontrado.")
+    Else
+        For nX := 1 To (cAlias)->(FCount())
+            aAdd(aPrd, {(cAlias)->(FieldName(nX)), AllTrim((cAlias)->(FieldGet(nX)))})
+        Next nX
+    Endif
+
+Return aPrd
