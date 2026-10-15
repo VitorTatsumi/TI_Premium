@@ -23,7 +23,7 @@ Static Function ModelDef()
 
     Local oStruct := FWFormStruct(1, cAlias)
     Local oModel
-    Local bPre := {|| fPre()} //Antes de abrir o formulário
+    Local bPre := {|| u_fbPre()} //Antes de abrir o formulário
     Local bPos := Nil //Clicar em CONFIRMAR antes de salvar
     Local bCommit := Nil //Após fechar o Formulário quando for salvar
     Local bCancel := Nil //Ao clicar em CANCELAR
@@ -66,7 +66,7 @@ Static Function MenuDef()
 Return aRotina
 
 //Validação que acontece antes da abertura do formulário
-Static Function fPre()
+User Function fbPre()
 
 	Local oModelAct := FWModelActive()
 	Local lRet := .T.
