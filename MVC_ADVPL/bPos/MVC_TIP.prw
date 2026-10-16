@@ -1,0 +1,151 @@
+#Include 'Protheus.ch'
+#Include 'FWMVCDef.ch'
+#include "tbiconn.ch"
+
+#DEFINE cAliasPai "SB1"
+#DEFINE cAliasFilho "SB5"
+
+User Function MVC_TIP()
+
+    Local aArea := GetArea()
+    Local oBrowse
+    Private aRotina := MenuDef()
+
+    oBrowse := FWMBrowse():New()
+    oBrowse:SetAlias(cAliasPai)
+    oBrowse:SetDescription("MVC_TI_PREMIUM")
+    oBrowse:DisableDetails()
+    oBrowse:Activate()
+    RestArea(aArea)
+
+
+Return Nil
+
+
+Static Function ModelDef()
+
+    Local oStructPai := FWFormStruct(1, cAliasPai)
+    Local oStructFilho := FWFormStruct(1, cAliasFilho)
+    Local oModel
+    Local aRelation := {}
+    Local bPre := {|| u_fbPre()} //Antes de abrir o formulário
+    Local bPos := {|| u_fbPos()} //Clicar em CONFIRMAR antes de salvar
+    Local bCommit := Nil         //Após fechar o Formulário quando for salvar
+    Local bCancel := Nil         //Ao clicar em CANCELAR
+	Local bLinePos := {|oMdl| u_fbLinePos(oModel)}
+
+    oModel := MPFormModel():New("MVC_TIPM",;
+                                bPre /*Validação que acontece antes da abertura do formulário*/,;
+                                bPos /*Função acionada quando o usuário clicar em CONFIRMAR*/,;
+                                bCommit,;
+                                bCancel)
+
+    oModel:AddFields("MVCMASTER",, oStructPai)
+
+    oModel:AddGrid("MVCDETAIL", "MVCMASTER", oStructFilho,;
+                                /*bLinePre*/,;
+                                bLinePos /*Função acionada quando o usuário sair da linha do grid*/,;
+                                /*bPre - Grid Inteiro*/,;
+                                /*bPos - Grid Inteiro*/)
+    oModel:SetDescription("MVC TI PREMIUM ESTUDOS")
+    oModel:GetModel("MVCMASTER"):SetDescription("MVC TI PREMIUM CAMPOS")
+    oModel:GetModel("MVCDETAIL"):SetDescription("MVC TI PREMIUM DETALHES")
+    oModel:SetPrimaryKey({})    
+
+    aAdd(aRelation, {"B5_FILIAL", "FWxFilial('SB5')"})
+    aAdd(aRelation, {"B5_COD", "B1_COD"})
+    oModel:SetRelation("MVCDETAIL", aRelation, SB5->(IndexKey(1)))
+
+    //"Validação" de linha duplicada no grid
+    oModel:GetModel("MVCDETAIL"):SetUniqueLine({"B5_COD"})
+
+Return oModel
+
+Static Function ViewDef()
+
+    Local oModel := FWLoadModel("MVC_TIP")
+    Local oStructPai := FWFormStruct(2, cAliasPai)
+    Local oStructFilho := FWFormStruct(2, cAliasFilho)
+    Local oView
+
+    oView := FWFormView():New()
+    oView:SetModel(oModel)
+    oView:AddField("VIEW_MVCPAI", oStructPai, "MVCMASTER")
+    oView:AddGrid("VIEW_MVCFILHO", oStructFilho, "MVCDETAIL")
+    oView:CreateHorizontalBox("CABEC", 70)
+    oView:CreateHorizontalBox("GRID", 30)
+    oView:SetOwnerView("VIEW_MVCPAI", "CABEC")
+    oView:SetOwnerView("VIEW_MVCFILHO", "GRID")
+
+    //Remoção de campo. Caso haja mais de um campo, utilizar aEval + StrTokArr para remoção em lote
+    oStructFilho:RemoveField("B5_PRV2")
+
+    //oView:AddIncrementField("MVCDETAIL", )
+
+Return oView
+
+
+Static Function MenuDef()
+
+	Local aRotina := {}
+
+	ADD OPTION aRotina TITLE 'Visualizar' ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_VIEW   ACCESS 0 //OPERATION 1
+	ADD OPTION aRotina TITLE 'Incluir'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_INSERT ACCESS 0 //OPERATION 3
+	ADD OPTION aRotina TITLE 'Alterar'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_UPDATE ACCESS 0 //OPERATION 4
+	ADD OPTION aRotina TITLE 'Excluir'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_DELETE ACCESS 0 //OPERATION 5
+
+    //Caso deseje a inclusão de uma rotina personalizada, pode ser adicionado mais um botão à lista chamando a rotina personalizada, como no exemplo abaixo:
+    //ADD OPTION aRotina TITLE 'Rotina Personalizada' ACTION 'MVC_TI_PREMIUM' OPERATION MODEL_OPERATION_CUSTOM ACCESS 0 //OPERATION 6
+
+Return aRotina
+
+//Função acionada quando o usuário alterar a linha do grid
+User Function fbLinePos(oMod) 
+
+	//É passado o modelo (tela inteira do formulário) e a partir disso é possível extrair as informações necessárias para manipulação
+	Local lRet := .T.
+	Local oModelCabe := oMod:GetModel("MVCMASTER") //Com o modelo, extraio o Cabeçalho
+	Local oModelGrid := oMod:GetModel("MVCDETAIL") //Com o modelo, extraio o detalhes
+	Local nOperation := oMod:GetOperation()        //Extraio a operação realizada
+	Local cProdB1 := oModelCabe:GetValue("B1_COD") //Extraio o valor do campo
+	Local cProdB5 := oModelGrid:GetValue("B5_COD") //Extraio o valor do campo
+
+	//Se a operação for Inserção ou Alteração
+	If nOperation == MODEL_OPERATION_INSERT .OR. nOperation == MODEL_OPERATION_UPDATE
+		//Se as informações de código do produto for diferente entre cabeçalho e itens
+		If Empty(AllTrim(cProdB5)) .OR. AllTrim(cProdB1) != AllTrim(cProdB5)
+			//Alert("Produtos diferentes", "Atenção!")
+			//lRet := .F.
+		Endif
+	Endif
+	
+Return	lRet
+
+//Validação que acontece antes da abertura do formulário
+User Function fbPre()
+
+	Local oModelAct := FWModelActive()
+	Local oModMaster := oModelAct:GetModel("MVCMASTER")
+	Local oModMasterStruct := oModMaster:GetStruct()
+
+	Local lRet := .T.
+
+	//O campo B1_DESC do modelo ativo ganha a propriedade onde este campo somente pode ser alterado quando for uma inclusão
+	oModMasterStruct:SetProperty("B1_DESC", MODEL_FIELD_WHEN, FwBuildFeature(STRUCT_FEATURE_WHEN, "INCLUI"))
+
+Return lRet
+
+//Função acionada quando o usuário clicar em CONFIRMAR
+User Function fbPos()
+
+    Local oModelAct := FWModelActive()
+    Local oModMaster := oModelAct:GetModel("MVCDETAIL")
+    Local cPrdGrid := oModMaster:GetValue("B5_CEME")
+    Local lRet := .T.
+    
+    If AllTrim(cPrdGrid) == "TESTE"
+        Alert("Não", "Não")
+        lRet := .F. 
+    Endif
+
+Return lRet
