@@ -114,8 +114,8 @@ User Function fbLinePos(oMod)
 	If nOperation == MODEL_OPERATION_INSERT .OR. nOperation == MODEL_OPERATION_UPDATE
 		//Se as informações de código do produto for diferente entre cabeçalho e itens
 		If Empty(AllTrim(cProdB5)) .OR. AllTrim(cProdB1) != AllTrim(cProdB5)
-			//Alert("Produtos diferentes", "Atenção!")
-			//lRet := .F.
+			Alert("Produtos diferentes", "Atenção!")
+			lRet := .F.
 		Endif
 	Endif
 	
