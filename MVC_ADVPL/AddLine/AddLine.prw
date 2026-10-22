@@ -1,0 +1,103 @@
+#Include 'Protheus.ch'
+#Include 'FWMVCDef.ch'
+#include "tbiconn.ch"
+
+#DEFINE cAliasPai "SB1"
+#DEFINE cAliasFilho "SB5"
+
+User Function MVC_TIP()
+
+    Local aArea := GetArea()
+    Local oBrowse
+    Private aRotina := MenuDef()
+
+    oBrowse := FWMBrowse():New()
+    oBrowse:SetAlias(cAliasPai)
+    oBrowse:SetDescription("MVC_TI_PREMIUM")
+    oBrowse:DisableDetails()
+    oBrowse:Activate()
+    RestArea(aArea)
+
+Return Nil
+
+Static Function ModelDef()
+
+    Local oStructPai := FWFormStruct(1, cAliasPai)
+    Local oStructFilho := FWFormStruct(1, cAliasFilho)
+    Local oModel
+    Local aRelation := {}
+    Local bPre := Nil //Antes de abrir o formulário
+    Local bPos := Nil //Clicar em CONFIRMAR antes de salvar
+    Local bCommit := Nil //Após fechar o Formulário quando for salvar
+    Local bCancel := Nil //Ao clicar em CANCELAR
+
+    oModel := MPFormModel():New("MVC_TIPM", bPre, bPos, bCommit, bCancel)
+    oModel:AddFields("MVCMASTER",, oStructPai)
+    oModel:AddGrid("MVCDETAIL", "MVCMASTER", oStructFilho)
+    oModel:SetDescription("MVC TI PREMIUM ESTUDOS")
+    oModel:GetModel("MVCMASTER"):SetDescription("MVC TI PREMIUM CAMPOS")
+    oModel:GetModel("MVCDETAIL"):SetDescription("MVC TI PREMIUM DETALHES")
+    oModel:SetPrimaryKey({})    
+
+    aAdd(aRelation, {"B5_FILIAL", "FWxFilial('SB5')"})
+    aAdd(aRelation, {"B5_COD", "B1_COD"})
+    oModel:SetRelation("MVCDETAIL", aRelation, SB5->(IndexKey(1)))
+
+    //"Validação" de linha duplicada no grid
+    oModel:GetModel("MVCDETAIL"):SetUniqueLine({"B5_COD"})
+
+Return oModel
+
+Static Function ViewDef()
+
+    Local oModel := FWLoadModel("MVC_TIP")
+    Local oStructPai := FWFormStruct(2, cAliasPai)
+    Local oStructFilho := FWFormStruct(2, cAliasFilho)
+    Local oView
+
+    oView := FWFormView():New()
+    oView:SetModel(oModel)
+    oView:AddField("VIEW_MVCPAI", oStructPai, "MVCMASTER")
+    oView:AddGrid("VIEW_MVCFILHO", oStructFilho, "MVCDETAIL")
+    oView:CreateHorizontalBox("CABEC", 70)
+    oView:CreateHorizontalBox("GRID", 30)
+    oView:SetOwnerView("VIEW_MVCPAI", "CABEC")
+    oView:SetOwnerView("VIEW_MVCFILHO", "GRID")
+
+    //Remoção de campo. Caso haja mais de um campo, utilizar aEval + StrTokArr para remoção em lote
+    oStructFilho:RemoveField("B5_PRV2")
+
+    //Exibir no Outras ações
+    oView:AddUserButton("*AddLine", "MAGIC_BMP", {||u_addLine()},,,,.F.)
+
+    //oView:AddIncrementField("MVCDETAIL", )
+
+Return oView
+
+
+Static Function MenuDef()
+
+	Local aRotina := {}
+
+	ADD OPTION aRotina TITLE 'Visualizar' ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_VIEW   ACCESS 0 //OPERATION 1
+	ADD OPTION aRotina TITLE 'Incluir'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_INSERT ACCESS 0 //OPERATION 3
+	ADD OPTION aRotina TITLE 'Alterar'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_UPDATE ACCESS 0 //OPERATION 4
+	ADD OPTION aRotina TITLE 'Excluir'    ACTION 'VIEWDEF.MVC_TIP' OPERATION MODEL_OPERATION_DELETE ACCESS 0 //OPERATION 5
+
+    //Caso deseje a inclusão de uma rotina personalizada, pode ser adicionado mais um botão à lista chamando a rotina personalizada, como no exemplo abaixo:
+    //ADD OPTION aRotina TITLE 'Rotina Personalizada' ACTION 'MVC_TI_PREMIUM' OPERATION MODEL_OPERATION_CUSTOM ACCESS 0 //OPERATION 6
+
+Return aRotina
+
+
+User Function addLine()
+
+    Local aArea := FWGetArea()
+    Local oModelPad := FWModelActive()
+    Local oModelGrid := oModelPad:GetModel("MVCDETAIL")
+
+    oModelGrid:AddLine()
+
+    FWRestArea(aArea)
+
+Return
