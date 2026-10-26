@@ -194,7 +194,7 @@ User Function fCustom(oPanel)
     oSaySubTit := TSay():New(014, 045, {||cSaySubTit}, oPanel, "", oFontSubN, , , , .T., RGB(031, 073, 125), , 30)
 
     //Botões
-    oBtnUsr  := TButton():New(001, (nLarg/2) - (nLargBtn * 3) - 3, "Usuário", oPanel, {||FWAlertInfo(UsrRetName(RetCodUsr()), "Usuário Logado")}, nLargBtn, 015, , oFontBtn, , .T.)
+    oBtnUsr  := TButton():New(001 /*Linha do botão*/, (nLarg/2) - (nLargBtn * 3) - 3 /*Coluna do botão*/, "Usuário" /*Texto do botão*/, oPanel /*Objeto onde o botão estará localizado*/, {||FWAlertInfo(UsrRetName(RetCodUsr()), "Usuário Logado")} /*Bloco de código acionado ao clicar no botão*/, nLargBtn /*Largura do botão*/, 015 /*Altura do botão*/,, oFontBtn /*Fonte padrão do botão*/, , .T. /*Se dimensão em Pixels*/)
     oBtnHora := TButton():New(001, (nLarg/2) - (nLargBtn * 2) - 3, "Hora", oPanel, {||FWAlertInfo(Time(), "Hora Atual")}, nLargBtn, 015, , oFontBtn, , .T.)
     oBtnData := TButton():New(001, (nLarg/2) - (nLargBtn * 1) - 3, "Data", oPanel, {||FWAlertInfo(DToC(Date()), "Data Atual")}, nLargBtn, 015, , oFontBtn, , .T.)
     
