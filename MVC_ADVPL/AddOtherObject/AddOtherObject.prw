@@ -173,15 +173,15 @@ Return aRotina
 
 User Function fCustom(oPanel)
 
-    Local aArea := FWGetArea()
-    Local nLarg := oPanel:nWidth //Largura do painel disponível
-    Local nLineObj := 0
-    Local nLargBtn := 60
+    Local aArea     := FWGetArea()
+    Local nLarg     := oPanel:nWidth //Largura do painel disponível
+    Local nLineObj  := 0
+    Local nLargBtn  := 60
 
-    Local cFontPad := "Tahoma"
-    Local oFontBtn := TFont():New(cFontPad, , -14)
-    Local oFontMod := TFont():New(cFontPad, , -38)
-    Local oFontSub := TFont():New(cFontPad, , -20)
+    Local cFontPad  := "Tahoma"
+    Local oFontBtn  := TFont():New(cFontPad, , -14)
+    Local oFontMod  := TFont():New(cFontPad, , -38)
+    Local oFontSub  := TFont():New(cFontPad, , -20)
     Local oFontSubN := TFont():New(cFontPad, , -20, , .T.)
 
     Local oSayModulo, cSayModulo := "OBS"
@@ -194,9 +194,9 @@ User Function fCustom(oPanel)
     oSaySubTit := TSay():New(014, 045, {||cSaySubTit}, oPanel, "", oFontSubN, , , , .T., RGB(031, 073, 125), , 30)
 
     //Botões
-    oBtnUsr := TButton():New(001, (nLarg/2) - (nLargBtn * 3) - 3, "Usuário", oPanel, {||FWAlertInfo(UsrRetName(RetCodUsr()), "Usuário Logado")}, nLargBtn,)
-    oBtnHora := TButton():New(001, (nLarg/2) - (nLargBtn * 2) - 3, "Hora", oPanel, {||FWAlertInfo(Time(), "Hora Atual")}, nLargBtn,)
-    oBtnData := TButton():New(001, (nLarg/2) - (nLargBtn * 1) - 3, "Data", oPanel, {||FWAlertInfo(DToC(Date()), "Data Atual")}, nLargBtn,)
+    oBtnUsr  := TButton():New(001, (nLarg/2) - (nLargBtn * 3) - 3, "Usuário", oPanel, {||FWAlertInfo(UsrRetName(RetCodUsr()), "Usuário Logado")}, nLargBtn, 015, , oFontBtn, , .T.)
+    oBtnHora := TButton():New(001, (nLarg/2) - (nLargBtn * 2) - 3, "Hora", oPanel, {||FWAlertInfo(Time(), "Hora Atual")}, nLargBtn, 015, , oFontBtn, , .T.)
+    oBtnData := TButton():New(001, (nLarg/2) - (nLargBtn * 1) - 3, "Data", oPanel, {||FWAlertInfo(DToC(Date()), "Data Atual")}, nLargBtn, 015, , oFontBtn, , .T.)
     
     nLineObj := 028
     oSayObs := TSay():New(nLineObj, 003, {|| "Exemplo de TSay dentro de um AddObject"}, oPanel, "", oFontBtn, , , , .T., RGB(150, 073, 125), , 20)
